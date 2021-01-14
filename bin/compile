@@ -1,0 +1,219 @@
+#!/bin/sh
+
+# --- Directories ---
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+# --- Helper ---
+indent() {
+    sed -u 's/^/       /'
+}
+
+cmd() {
+    COMMAND=$1
+    
+    echo "[exec] $COMMAND" | indent
+    export RUSTUP_HOME="$RUSTUP_HOME"
+    export CARGO_HOME="$CARGO_HOME" 
+    eval "$COMMAND"
+    STATUS=$?
+
+    if [ $STATUS -ne 0 ]; then
+        echo "Command execution failed with: $STATUS"
+        exit $STATUS
+    fi
+}
+
+# --- Variables ---
+
+export RUSTUP_HOME="$CACHE_DIR/rustup_home"
+export CARGO_HOME="$CACHE_DIR/cargo_home"
+export CARGO_BIN_DIR="$CARGO_HOME/bin"
+export MDBOOK_BIN="$CARGO_BIN_DIR/mdbook"
+export CARGO_BIN="$CARGO_BIN_DIR/cargo"
+export RUSTUP_BIN="$CARGO_BIN_DIR/rustup"
+export PATH="$CARGO_HOME_DIR:$PATH"
+
+if [ -f "$ENV_DIR/BOOK_WORKSPACE" ]; then
+    BOOK_WORKSPACE="$(cat $ENV_DIR/BOOK_WORKSPACE)"
+else
+    echo ""
+    echo "No BOOK_WORKSPACE env-var set!" | indent
+    echo "Assuming root to hold cargo workspace." | indent
+    BOOK_WORKSPACE="."
+fi
+
+if [ -f "$ENV_DIR/GIT_SSH_KEY" ]; then
+    GIT_SSH_KEY="$(cat $ENV_DIR/GIT_SSH_KEY)"
+else
+    echo ""
+    echo "No GIT_SSH_KEY env-var set!" | indent
+    echo "Checking out submodules might not work." | indent
+fi
+
+if [ -f "$ENV_DIR/GIT_URL" ]; then
+    GIT_URL="$(cat $ENV_DIR/GIT_URL)"
+else
+    echo ""
+    echo "No GIT_URL env-var set!" | indent
+    echo "Checking out submodules might not work." | indent
+fi
+
+if [ -f "$ENV_DIR/REMOTE_BRANCH" ]; then
+    REMOTE_BRANCH="$(cat $ENV_DIR/REMOTE_BRANCH)"
+else
+    echo ""
+    echo "No REMOTE_BRANCH env-var set!" | indent
+    echo "Will try to determine the default branch." | indent
+fi
+
+# --- Debug directories (before) ---
+if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
+    echo "-----> Listing content of heroku folders"
+    
+    echo ""
+    echo "Build content:" | indent
+    cmd "find $BUILD_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    echo ""
+    echo "Cache content:" | indent
+    cmd "find $CACHE_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    echo ""
+    echo "ENV content:" | indent
+    cmd "find $ENV_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+fi
+
+# --- Check Cache ---
+echo "-----> Checking cache" 
+
+if [ ! -d "$CACHE_DIR" ]; then
+    echo ""
+    echo "Did not find cache directory!" | indent
+    echo "Creating cache ..." | indent
+    mkdir -p "$CACHE_DIR"
+fi
+
+# --- Submodules ---
+echo "-----> Submodules"
+echo "-----> Installing SSH Key ..."
+mkdir -p ~/.ssh
+ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2> /dev/null
+cp "$ENV_DIR/GIT_SSH_KEY" ~/.ssh/id_rsa
+echo >> ~/.ssh/id_rsa
+chmod 600 ~/.ssh/id_rsa
+
+echo "-----> Setting SSH settings ..."
+echo "Host *" >> ~/.ssh/config
+echo "   StrictHostKeyChecking no" >> ~/.ssh/config
+echo "   UserKnownHostsFile /dev/null" >> ~/.ssh/config
+echo "   LogLevel ERROR" >> ~/.ssh/config
+
+# Clean build dir (we need to checkout it again ...)
+echo "-----> Cleaning Build-Directory"
+rm -rf "$BUILD_DIR/*"
+
+# Checkout submodules
+cd "$BUILD_DIR"
+
+echo "-----> Initializing repository"
+git init
+echo "-----> Adding remote"
+git remote add origin "$GIT_URL"
+echo "-----> Fetching from remote"
+git fetch --all
+
+# Determine branch to pull on
+if [ -z "$REMOTE_BRANCH" ]; then
+    # Get remote default branch
+    DEFAULT_BRANCH="$(git remote show origin | grep 'HEAD branch' | sed 's/.*: //')"
+
+    BRANCH="$DEFAULT_BRANCH"
+else
+    BRANCH="$REMOTE_BRANCH"
+fi
+
+echo "-----> Pulling from '$BRANCH'"
+git reset --hard "origin/$BRANCH"
+
+echo "-----> Updating and initializing submodules"
+git submodule update --init --recursive | indent
+git submodule status | indent
+
+# Move out of build directory
+cd ".."
+
+# --- Rust installation ---
+echo "-----> Checking Rust, Rustup and Cargo"
+
+if [ -d "$RUSTUP_HOME" ] && [ -d "$CARGO_HOME" ]; then
+    echo "Found rustup and cargo home in cache; Performing updates ..." | indent
+    
+    cmd "$RUSTUP_BIN self update"
+    cmd "$RUSTUP_BIN update "
+    cmd "$RUSTUP_BIN default $RUST_TOOLCHAIN"
+else
+    echo "Failed finding rustup or cargo home in cache; Performing installation ..." | indent
+
+    RUSTUP_SOURCE="$(curl https://sh.rustup.rs -sSf)"
+    RUSTUP_PATH="$CACHE_DIR/rustup.sh"
+    if [ $? -ne 0 ]; then
+        echo "Failed fetching rustup installation script!" | indent
+        exit 1
+    fi
+
+    if [ -d "$CACHE_DIR" ]; then
+        mkdir -p "$CACHE_DIR"
+    fi
+
+    echo "$RUSTUP_SOURCE" > "$RUSTUP_PATH"
+    chmod +x "$RUSTUP_PATH"
+    cmd "$RUSTUP_PATH -y --default-toolchain $RUST_TOOLCHAIN"
+    rm "$RUSTUP_PATH"
+fi
+
+# --- Install MdBook ---
+echo "-----> Installing MdBook"
+cmd "$CARGO_BIN install mdbook"
+
+# --- Build book ---
+echo "-----> Building book ..."
+
+cmd "$MDBOOK_BIN build $BOOK_WORKSPACE"
+
+echo "-----> Clean build directory"
+cmd "cd $BUILD_DIR"
+cmd "rm -rf *"
+
+if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
+    echo ""
+    echo "Build content (after clean):" | indent
+    cmd "find $BUILD_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    cmd "du -sh $BUILD_DIR"
+fi
+
+echo "-----> Copy target from cache"
+cmd "cp -r $BOOK_WORKSPACE/book/* $BUILD_DIR"
+
+# --- Debug directories (after) ---
+if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
+    echo "-----> Listing content of heroku folders"
+    
+    echo ""
+    echo "Build content:" | indent
+    cmd "find $BUILD_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    echo ""
+    echo "Cache content:" | indent
+    cmd "find $CACHE_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    echo ""
+    echo "ENV content:" | indent
+    cmd "find $ENV_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+
+    echo ""
+    echo "Target content:" | indent
+    cmd "find $CARGO_TARGET_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
+fi
