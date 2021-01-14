@@ -184,18 +184,6 @@ fi
 echo "-----> Building book ..."
 cmd "$MDBOOK_BIN build --dest-dir $BUILD_DIR/book $BUILD_DIR/$BOOK_WORKSPACE"
 
-echo "-----> Clean build directory"
-cmd "cd $BUILD_DIR"
-cmd "rm -rf *"
-
-if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
-    echo ""
-    echo "Build content (after clean):" | indent
-    cmd "find $BUILD_DIR | sed -e 's/[^-][^\/]*\// |/g' -e 's/|\([^ ]\)/|-\1/'"
-
-    cmd "du -sh $BUILD_DIR"
-fi
-
 # --- Debug directories (after) ---
 if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
     echo "-----> Listing content of heroku folders"
