@@ -1,46 +1,8 @@
 #!/bin/sh
 
-# --- Directories ---
-BUILD_DIR=$1
-CACHE_DIR=$2
-ENV_DIR=$3
+# Unfortunately, it is impossible to now at this stage 
+# if the project is valid or not.
+# It would be possible for the easy part (i.e. single crate at root),
+# but for everything else, especially submodules, it is impossible.
 
-# --- Helper ---
-indent() {
-    sed -u 's/^/       /'
-}
-
-cmd() {
-    COMMAND=$1
-    
-    echo "[exec] $COMMAND" | indent
-    export RUSTUP_HOME="$RUSTUP_HOME"
-    export CARGO_HOME="$CARGO_HOME" 
-    eval "$COMMAND"
-    STATUS=$?
-
-    if [ $STATUS -ne 0 ]; then
-        echo "Command execution failed with: $STATUS"
-        exit $STATUS
-    fi
-}
-
-# --- Variables ---
-
-if [ -f "$ENV_DIR/BOOK_WORKSPACE" ]; then
-    BOOK_WORKSPACE="$(cat $ENV_DIR/BOOK_WORKSPACE)"
-else
-    echo ""
-    echo "No BOOK_WORKSPACE env-var set!" | indent
-    echo "Assuming root to hold cargo workspace." | indent
-    BOOK_WORKSPACE="."
-fi
-
-# --- Check workspace for book.toml ---
-if [ ! -f "$BOOK_WORKSPACE/book.toml" ]; then
-    echo "No 'book.toml' found in workspace ($BOOK_WORKSPACE)!"
-    exit 1
-else
-    echo "Found 'book.toml' in workspace."
-    exit 0
-fi
+exit 0
