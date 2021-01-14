@@ -169,7 +169,7 @@ else
 
     echo "$RUSTUP_SOURCE" > "$RUSTUP_PATH"
     chmod +x "$RUSTUP_PATH"
-    cmd "$RUSTUP_PATH -y --default-toolchain $RUST_TOOLCHAIN"
+    cmd "$RUSTUP_PATH -y"
     rm "$RUSTUP_PATH"
 fi
 
