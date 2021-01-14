@@ -196,9 +196,6 @@ if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
     cmd "du -sh $BUILD_DIR"
 fi
 
-echo "-----> Copy book from cache"
-cmd "cp -r $BUILD_DIR/$BOOK_WORKSPACE/book/* $BUILD_DIR"
-
 # --- Debug directories (after) ---
 if [ ! -z "$DEBUG" ] && [ "$DEBUG" -eq 1 ]; then
     echo "-----> Listing content of heroku folders"
