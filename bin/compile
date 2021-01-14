@@ -182,7 +182,7 @@ fi
 
 # --- Build book ---
 echo "-----> Building book ..."
-cmd "$MDBOOK_BIN build $BUILD_DIR/$BOOK_WORKSPACE"
+cmd "$MDBOOK_BIN build --dest-dir $BUILD_DIR/book $BUILD_DIR/$BOOK_WORKSPACE"
 
 echo "-----> Clean build directory"
 cmd "cd $BUILD_DIR"
