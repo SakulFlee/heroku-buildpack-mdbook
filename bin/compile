@@ -174,12 +174,14 @@ else
 fi
 
 # --- Install MdBook ---
-echo "-----> Installing MdBook"
-cmd "$CARGO_BIN install mdbook"
+echo "-----> Checking MdBook"
+if [ ! -f "$MDBOOK_BIN" ]; then
+    echo "MdBook not found! Installing ..." | indent
+    cmd "$CARGO_BIN install mdbook"
+fi
 
 # --- Build book ---
 echo "-----> Building book ..."
-
 cmd "$MDBOOK_BIN build $BUILD_DIR/$BOOK_WORKSPACE"
 
 echo "-----> Clean build directory"
