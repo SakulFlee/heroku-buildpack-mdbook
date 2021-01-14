@@ -180,7 +180,7 @@ cmd "$CARGO_BIN install mdbook"
 # --- Build book ---
 echo "-----> Building book ..."
 
-cmd "$MDBOOK_BIN build $BOOK_WORKSPACE"
+cmd "$MDBOOK_BIN build $BUILD_DIR/$BOOK_WORKSPACE"
 
 echo "-----> Clean build directory"
 cmd "cd $BUILD_DIR"
