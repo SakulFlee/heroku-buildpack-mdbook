@@ -180,8 +180,13 @@ if [ ! -f "$MDBOOK_BIN" ]; then
     cmd "$CARGO_BIN install mdbook"
 fi
 
+# --- Copy possibly required files to binary root
+echo "-----> Preparing build directory"
+cmd "cp -r $BUILD_DIR/$BOOK_WORKSPACE/* $BUILD_DIR/"
+
 # --- Build book ---
 echo "-----> Building book ..."
+
 cmd "$MDBOOK_BIN build --dest-dir $BUILD_DIR/book $BUILD_DIR/$BOOK_WORKSPACE"
 
 # --- Debug directories (after) ---
